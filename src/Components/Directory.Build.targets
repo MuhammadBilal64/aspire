@@ -90,6 +90,8 @@
       <GeneratorCommandLine>$(GeneratorCommandLine) @"$(ConfigurationSchemaGeneratorRspPath)"</GeneratorCommandLine>
     </PropertyGroup>
 
+
+
     <Exec Command="$(GeneratorCommandLine)" />
 
     <ItemGroup>
