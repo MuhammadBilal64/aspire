@@ -260,6 +260,57 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
     }
 
     [Fact]
+    public async Task DashboardRunCommand_ExplicitPersistenceOption_OverridesEnvironmentValue()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        var environment = CreateEnvironment(new Dictionary<string, string?>
+        {
+            ["ASPIRE_DASHBOARD_PERSISTENCE_MODE"] = "Run"
+        });
+
+        string[]? capturedArgs = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace, environment: environment);
+        executionFactory.AssertionCallback = (args, _, _, _) => { capturedArgs = args; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run --persistence None");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedArgs);
+        Assert.Contains("--ASPIRE_DASHBOARD_PERSISTENCE_MODE=None", capturedArgs);
+        Assert.DoesNotContain("--ASPIRE_DASHBOARD_PERSISTENCE_MODE=Run", capturedArgs);
+    }
+
+    [Fact]
+    public async Task DashboardRunCommand_NoExplicitOption_UsesEnvironmentValue()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        var environment = CreateEnvironment(new Dictionary<string, string?>
+        {
+            ["ASPIRE_DASHBOARD_APPLICATION_NAME"] = "EnvApp"
+        });
+
+        string[]? capturedArgs = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace, environment: environment);
+        executionFactory.AssertionCallback = (args, _, _, _) => { capturedArgs = args; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedArgs);
+        Assert.DoesNotContain(capturedArgs, arg => arg.StartsWith("--ASPIRE_DASHBOARD_APPLICATION_NAME=", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task DashboardRunCommand_WithoutAllowAnonymous_SetsBrowserTokenEnvVar()
     {
         using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
@@ -625,7 +676,8 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
     private (IServiceCollection Services, string ManagedPath, TestProcessExecutionFactory ExecutionFactory) CreateServicesWithLayout(
         TemporaryWorkspace workspace,
         TestInteractionService? interactionService = null,
-        TestBundleService? bundleService = null)
+        TestBundleService? bundleService = null,
+        IEnvironment? environment = null)
     {
         var layoutDir = Path.Combine(workspace.WorkspaceRoot.FullName, "layout");
         var managedDir = Path.Combine(layoutDir, "managed");
@@ -654,6 +706,10 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
             if (interactionService is not null)
             {
                 options.InteractionServiceFactory = _ => interactionService;
+            }
+            if (environment is not null)
+            {
+                options.EnvironmentFactory = _ => environment;
             }
         });
 

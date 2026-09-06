@@ -201,12 +201,14 @@ internal sealed class DashboardRunCommand : BaseCommand
     private static void AddStringOptionArg(ParseResult parseResult, List<string> args, IReadOnlyList<string> unmatchedTokens,
         IEnvironment environment, Option<string?> option, string envVarName, string? defaultValue)
     {
-        if (ConfigSettingHasValue(unmatchedTokens, environment, envVarName))
+        var explicitResult = parseResult.GetResult(option);
+
+        if (explicitResult is null && ConfigSettingHasValue(unmatchedTokens, environment, envVarName))
         {
             return;
         }
 
-        var value = parseResult.GetResult(option) is not null
+        var value = explicitResult is not null
             ? parseResult.GetValue(option)
             : defaultValue;
 
@@ -219,18 +221,18 @@ internal sealed class DashboardRunCommand : BaseCommand
     private static void AddBoolOptionArg(ParseResult parseResult, List<string> args, IReadOnlyList<string> unmatchedTokens,
         IEnvironment environment, Option<bool> option, string envVarName, bool? defaultValue = null)
     {
-        if (ConfigSettingHasValue(unmatchedTokens, environment, envVarName))
+        var result = parseResult.GetResult(option);
+        var isExplicit = result is not null && !result.Implicit;
+        if (!isExplicit && ConfigSettingHasValue(unmatchedTokens, environment, envVarName))
         {
             return;
         }
-
-        var result = parseResult.GetResult(option);
 
         // When the user explicitly specified the option, use their value.
         // When a defaultValue is provided and the user did not specify the option, use the default.
         // Without a defaultValue, skip when the result comes from the option's default value rather
         // than explicit user input, to avoid always emitting e.g. "--ALLOW_ANONYMOUS=false".
-        if (result is not null && !result.Implicit)
+        if (isExplicit)
         {
             var value = parseResult.GetValue(option);
             args.Add($"--{envVarName}={value.ToString().ToLowerInvariant()}");
