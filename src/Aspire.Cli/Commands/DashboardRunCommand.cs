@@ -120,6 +120,7 @@ internal sealed class DashboardRunCommand : BaseCommand
         // so that raw pass-through arguments (unmatched tokens) take precedence.
         var unmatchedTokens = parseResult.UnmatchedTokens;
         AddOptionArgs(parseResult, dashboardArgs, unmatchedTokens, _environment);
+        dashboardArgs.AddRange(unmatchedTokens);
 
         // Resolve the effective anonymous-access setting using the same precedence
         // (forwarded arg, then unmatched token, then environment) that determines what
@@ -160,8 +161,6 @@ internal sealed class DashboardRunCommand : BaseCommand
                 }
             }
         }
-
-        dashboardArgs.AddRange(unmatchedTokens);
 
         // Resolve URLs for the summary display.
         var dashboardInfo = ResolveDashboardInfo(dashboardArgs, unmatchedTokens, _environment, browserToken);

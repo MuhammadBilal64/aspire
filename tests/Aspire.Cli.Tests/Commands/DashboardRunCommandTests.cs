@@ -364,6 +364,31 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
     }
 
     [Fact]
+    public async Task DashboardRunCommand_ConflictingTypedAndUnmatchedAllowAnonymous_UnmatchedTokenWins()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        string[]? capturedArgs = null;
+        IDictionary<string, string>? capturedEnv = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace);
+        executionFactory.AssertionCallback = (args, env, _, _) => { capturedArgs = args; capturedEnv = env; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run --allow-anonymous --ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=false");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedArgs);
+        Assert.Equal(
+            "--ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=false",
+            capturedArgs.Last(a => a.StartsWith("--ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=", StringComparison.Ordinal)));
+        Assert.NotNull(capturedEnv);
+        Assert.True(capturedEnv.ContainsKey("DASHBOARD__FRONTEND__BROWSERTOKEN"));
+    }
+
+    [Fact]
     public async Task DashboardRunCommand_WithoutAllowAnonymous_SetsBrowserTokenEnvVar()
     {
         using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
