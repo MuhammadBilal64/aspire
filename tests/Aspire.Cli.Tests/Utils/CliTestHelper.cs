@@ -91,6 +91,7 @@ internal static class CliTestHelper
         // Populate feature flag configuration in in-memory collection.
         options.ConfigurationCallback += config =>
         {
+
             foreach (var featureFlag in options.EnabledFeatures)
             {
                 config[$"{KnownFeatures.FeaturePrefix}:{featureFlag}"] = "true";
@@ -704,6 +705,7 @@ internal sealed class CliServiceCollectionTestOptions
     // Layout discovery - returns null by default (no bundle layout), causing SDK mode fallback
     public Func<IServiceProvider, ILayoutDiscovery> LayoutDiscoveryFactory { get; set; } = _ => new NullLayoutDiscovery();
     public Func<IServiceProvider, IEnvironment> EnvironmentFactory { get; set; } = _ => new TestEnvironment();
+
     // Bundle service - returns no-op implementation by default (no embedded bundle)
     public Func<IServiceProvider, IBundleService> BundleServiceFactory { get; set; } = _ => new NullBundleService();
 
