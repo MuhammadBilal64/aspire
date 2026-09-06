@@ -302,41 +302,35 @@ internal sealed class DashboardRunCommand : BaseCommand
     /// </summary>
     internal static string? ResolveSettingValue(List<string> args, IReadOnlyList<string> unmatchedTokens, IEnvironment environment, string key)
     {
-        // First check --KEY=value in args (last-wins).
-        var result = ResolveArgValue(args, key);
-        if (result is not null)
-        {
-            return result;
-        }
+        var combined = new List<string>(args);
+        combined.AddRange(unmatchedTokens); // safe even if args already contains these — last-wins is idempotent under duplication
 
-        // Check unmatched tokens for space-separated form: --KEY value
+        string? result = null;
+        var equalsPrefix = $"--{key}=";
         var bareKey = $"--{key}";
-        for (var i = 0; i < unmatchedTokens.Count; i++)
+        for (var i = 0; i < combined.Count; i++)
         {
-            if (unmatchedTokens[i].Equals(bareKey, StringComparison.OrdinalIgnoreCase) && i + 1 < unmatchedTokens.Count)
+            var arg = combined[i];
+            if (arg.StartsWith(equalsPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return unmatchedTokens[i + 1];
+                result = arg[equalsPrefix.Length..];
+            }
+            else if (arg.Equals(bareKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 < combined.Count && !combined[i + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    result = combined[i + 1];
+                    i++;
+                }
+                else
+                {
+                    result = "true";
+                }
             }
         }
 
         // Fall back to environment variable.
-        return environment.GetEnvironmentVariable(key);
-    }
-
-    internal static string? ResolveArgValue(List<string> args, string key)
-    {
-        // Scan for --KEY=value (last-wins).
-        string? result = null;
-        var prefix = $"--{key}=";
-        foreach (var arg in args)
-        {
-            if (arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                result = arg.Substring(prefix.Length);
-            }
-        }
-
-        return result;
+        return result ?? environment.GetEnvironmentVariable(key);
     }
 
     internal sealed record DashboardInfo(string DashboardUrl, string OtlpGrpcUrl, string OtlpHttpUrl);

@@ -389,6 +389,32 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
     }
 
     [Fact]
+    public async Task DashboardRunCommand_TypedTrueThenSpaceSeparatedUnmatchedFalse_StillGeneratesCredentials()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        string[]? capturedArgs = null;
+        IDictionary<string, string>? capturedEnv = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace);
+        executionFactory.AssertionCallback = (args, env, _, _) => { capturedArgs = args; capturedEnv = env; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run --allow-anonymous --ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS false");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedEnv);
+        // The later space-separated unmatched token makes the effective value false,
+        // so the dashboard runs secured — credentials MUST be generated or it's unreachable.
+        Assert.True(capturedEnv.ContainsKey("DASHBOARD__FRONTEND__BROWSERTOKEN"));
+        Assert.False(string.IsNullOrEmpty(capturedEnv["DASHBOARD__FRONTEND__BROWSERTOKEN"]));
+        Assert.True(capturedEnv.ContainsKey("DASHBOARD__API__PRIMARYAPIKEY"));
+        Assert.False(string.IsNullOrEmpty(capturedEnv["DASHBOARD__API__PRIMARYAPIKEY"]));
+    }
+
+    [Fact]
     public async Task DashboardRunCommand_WithoutAllowAnonymous_SetsBrowserTokenEnvVar()
     {
         using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
