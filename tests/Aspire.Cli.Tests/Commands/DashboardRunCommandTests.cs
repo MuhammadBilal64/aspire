@@ -311,6 +311,59 @@ public class DashboardRunCommandTests(ITestOutputHelper outputHelper)
     }
 
     [Fact]
+    public async Task DashboardRunCommand_ExplicitAllowAnonymousFalse_OverridesEnvironmentValue()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        var environment = CreateEnvironment(new Dictionary<string, string?>
+        {
+            ["ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS"] = "true"
+        });
+
+        string[]? capturedArgs = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace, environment: environment);
+        executionFactory.AssertionCallback = (args, _, _, _) => { capturedArgs = args; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run --allow-anonymous false");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedArgs);
+        Assert.Contains("--ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=false", capturedArgs);
+    }
+
+    [Fact]
+    public async Task DashboardRunCommand_ExplicitAllowAnonymousFalse_OverridesEnvironment_StillGeneratesCredentials()
+    {
+        using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);
+
+        var environment = CreateEnvironment(new Dictionary<string, string?>
+        {
+            ["ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS"] = "true"
+        });
+
+        IDictionary<string, string>? capturedEnv = null;
+        var (services, _, executionFactory) = CreateServicesWithLayout(workspace, environment: environment);
+        executionFactory.AssertionCallback = (_, env, _, _) => { capturedEnv = env; };
+
+        using var provider = services.BuildServiceProvider();
+        var command = provider.GetRequiredService<RootCommand>();
+        var result = command.Parse("dashboard run --allow-anonymous false");
+
+        var exitCode = await result.InvokeAsync().DefaultTimeout();
+
+        Assert.Equal(CliExitCodes.Success, exitCode);
+        Assert.NotNull(capturedEnv);
+        Assert.True(capturedEnv.ContainsKey("DASHBOARD__FRONTEND__BROWSERTOKEN"));
+        Assert.False(string.IsNullOrEmpty(capturedEnv["DASHBOARD__FRONTEND__BROWSERTOKEN"]));
+        Assert.True(capturedEnv.ContainsKey("DASHBOARD__API__PRIMARYAPIKEY"));
+        Assert.False(string.IsNullOrEmpty(capturedEnv["DASHBOARD__API__PRIMARYAPIKEY"]));
+    }
+
+    [Fact]
     public async Task DashboardRunCommand_WithoutAllowAnonymous_SetsBrowserTokenEnvVar()
     {
         using var workspace = TemporaryWorkspace.CreateForCli(outputHelper);

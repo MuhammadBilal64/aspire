@@ -119,8 +119,14 @@ internal sealed class DashboardRunCommand : BaseCommand
         // Build args from typed options. These are added before unmatched tokens
         // so that raw pass-through arguments (unmatched tokens) take precedence.
         var unmatchedTokens = parseResult.UnmatchedTokens;
-        var allowAnonymous = parseResult.GetValue(s_allowAnonymousOption);
         AddOptionArgs(parseResult, dashboardArgs, unmatchedTokens, _environment);
+
+        // Resolve the effective anonymous-access setting using the same precedence
+        // (forwarded arg, then unmatched token, then environment) that determines what
+        // actually reaches the child process, so credential generation below stays
+        // consistent with what AddOptionArgs just decided to forward.
+        var allowAnonymousValue = ResolveSettingValue(dashboardArgs, unmatchedTokens, _environment, KnownConfigNames.DashboardUnsecuredAllowAnonymous);
+        var allowAnonymous = allowAnonymousValue is not null && bool.TryParse(allowAnonymousValue, out var parsedAllowAnonymous) && parsedAllowAnonymous;
 
         // Set a browser token for frontend auth unless anonymous access is enabled.
         // Tokens and keys are passed via environment variables (not command-line args)
@@ -133,7 +139,7 @@ internal sealed class DashboardRunCommand : BaseCommand
             ["Logging__LogLevel__Default"] = LogLevel.Debug.ToString()
         };
         layoutLease?.AddEnvironment(environmentVariables);
-        if (!allowAnonymous && !ConfigSettingHasValue(unmatchedTokens, _environment, KnownConfigNames.DashboardUnsecuredAllowAnonymous))
+        if (!allowAnonymous)
         {
             if (!ConfigSettingHasValue(unmatchedTokens, _environment, DashboardConfigNames.DashboardFrontendBrowserTokenName.EnvVarName))
             {
